@@ -54,7 +54,7 @@ router.route("/register").post((req, res) => {
                             token
                         })
                     }
-                    
+
                 });
 
             });
@@ -72,10 +72,10 @@ router.route("/login").post((req, res) => {
         const options = {
             method: 'GET',
             url: process.env.URL_USERS,
-            qs: {email: user.email}
-          };
-          
-          request(options, function (error, response, body) {
+            qs: { email: user.email }
+        };
+
+        request(options, function (error, response, body) {
             if (error) throw new Error(error);
             let data = JSON.parse(body)
             bcrypt.compare(user.pass, data.password).then(function (result) {
@@ -91,10 +91,24 @@ router.route("/login").post((req, res) => {
                         token
                     })
                 }
-            }).catch((e)=>console.log(e))
-          });
-          
+            }).catch((e) => console.log(e))
+        });
+
     }
+})
+
+router.route("/myplants").get((req, res) => {
+    let correo = jwt.verify(req.query.token, process.env.JWT_SECRET).email
+    const options = {
+        method: 'GET',
+        url: process.env.URL_PLANTS,
+        qs: { email: correo }
+    };
+
+    request(options, function (error, response, body) {
+        if (error) throw new Error(error);
+        res.send(body)
+    });
 })
 
 module.exports = router;
