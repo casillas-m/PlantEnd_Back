@@ -1,8 +1,10 @@
 const router = require('express').Router();
-const bcrypt = require('bcrypt');//Para guardar las contraseñas
+const bcrypt = require('bcrypt'); //Para guardar las contraseñas
 const saltRounds = 10;
 const jwt = require('jsonwebtoken');
+const request = require('request');
 require('dotenv').config();
+
 
 router.route("/").get((req, res) => {
     res.json({
@@ -24,18 +26,37 @@ router.route("/register").post((req, res) => {
             //Datos correctos, intentar registrar (correo repetido?)
             bcrypt.hash(user.pass, saltRounds).then(function (hash) {
                 //TODO: Integrar registro con base de datos
-
-
-                if (false) {//Correo repetido
-                    res.sendStatus(406)
-                } else {
-                    //Registro correcto
-                    let token = jwt.sign({//Token de sesion
+                const options = {
+                    method: 'POST',
+                    url: process.env.URL_USERS,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: {
                         email: user.email,
-                        name: user.name
-                    }, process.env.JWT_SECRET);
-                    res.json({ token })
-                }
+                        name: user.name,
+                        password: hash
+                    },
+                    json: true
+                };
+
+                request(options, function (error, response, body) {
+                    if (error) throw new Error(error);
+                    else if (response.status == 406) { //Correo repetido
+                        res.sendStatus(406)
+                    } else {
+                        //Registro correcto
+                        let token = jwt.sign({ //Token de sesion
+                            email: user.email,
+                            name: user.name
+                        }, process.env.JWT_SECRET);
+                        res.json({
+                            token
+                        })
+                    }
+                    
+                });
+
             });
         }
     }
@@ -48,24 +69,31 @@ router.route("/login").post((req, res) => {
         res.sendStatus(418)
     } else {
         //TODO: Solicitar Hash, Email y Nombre de pass a DB
-        let userDB = {
-            hash:"",
-            name:"Martin",
-            email:"a@a"
-        }
-        bcrypt.compare(user.pass, userDB.hash).then(function (result) {
-            result=true//BORRAR ESTO-----------------------------------------------------------------------------
-            if (!result) {
-                //Password incorrecto
-                res.sendStatus(401)
-            } else {
-                let token = jwt.sign({//Token de sesion
-                    email: userDB.email,
-                    name: userDB.name
-                }, process.env.JWT_SECRET);
-                res.json({ token })
-            }
-        });
+        const options = {
+            method: 'GET',
+            url: process.env.URL_USERS,
+            qs: {email: user.email}
+          };
+          
+          request(options, function (error, response, body) {
+            if (error) throw new Error(error);
+            let data = JSON.parse(body)
+            bcrypt.compare(user.pass, data.password).then(function (result) {
+                if (!result) {
+                    //Password incorrecto
+                    res.sendStatus(401)
+                } else {
+                    let token = jwt.sign({ //Token de sesion
+                        email: data.email,
+                        name: data.name
+                    }, process.env.JWT_SECRET);
+                    res.json({
+                        token
+                    })
+                }
+            }).catch((e)=>console.log(e))
+          });
+          
     }
 })
 
