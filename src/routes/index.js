@@ -111,4 +111,19 @@ router.route("/myplants").get((req, res) => {
     });
 })
 
+router.route("/plants").get((req, res) => {
+    console.log(req.query.plant)
+    const options = {
+        method: 'GET',
+        url: process.env.URL_API_TREFLE,
+        qs: { plant: req.query.plant }
+    };
+
+    request(options, function (error, response, body) {
+        if (error) throw new Error(error);
+        console.log(response)
+        res.send(body)
+    });
+})
+
 module.exports = router;
