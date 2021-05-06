@@ -3,8 +3,18 @@ const bcrypt = require('bcrypt'); //Para guardar las contraseñas
 const saltRounds = 10;
 const jwt = require('jsonwebtoken');
 const request = require('request');
+const multer = require('multer');
+let upload = multer({ dest: 'uploads/' })
+const { v4: uuidv4 } = require('uuid');
 require('dotenv').config();
 
+
+const fs = require('fs');
+const AWS = require('aws-sdk');
+const s3 = new AWS.S3({
+    accessKeyId: process.env.AWS_ACCESS_KEY,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+});
 
 router.route("/").get((req, res) => {
     res.json({
@@ -112,7 +122,7 @@ router.route("/myplants").get((req, res) => {
 })
 
 router.route("/plants").get((req, res) => {
-    console.log(req.query.plant)
+    // console.log(req.query.plant)
     const options = {
         method: 'GET',
         url: process.env.URL_API_TREFLE,
@@ -124,6 +134,77 @@ router.route("/plants").get((req, res) => {
         console.log(response)
         res.send(body)
     });
+})
+
+router.route("/plants").post((req, res) => {
+    if (["token", "plant_name", "img_url", "common_name", "light_needed", "hum_needed"].some(e => req.body[e] == "")) {
+        res.sendStatus(400) //Información faltante
+    } else {
+        try {
+            let correo = jwt.verify(req.body.token, process.env.JWT_SECRET).email
+            let uuid = uuidv4();
+            let forma = JSON.parse(JSON.stringify(req.body)) //Clonando de objetos como un campeon
+            forma.email = correo
+            forma.plant_id = uuid
+            const options = {
+                method: 'POST',
+                url: process.env.URL_PLANTS,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(forma)
+            };
+
+            request(options, function (error, response, body) {
+                if (error) throw new Error(error);
+                res.send()
+            });
+        } catch (error) {
+            console.log('------------------------------------');
+            console.log(error);
+            console.log('------------------------------------');
+            res.sendStatus(401)
+        }
+    }
+
+})
+
+
+router.route("/image").post(upload.single('myFile'), (req, res) => {
+    const uploadFile = () => {
+        const fileStream = fs.createReadStream(req.file.path);
+        const params = {
+            Bucket: 'plantendp2w', // pass your bucket name
+            Key: `${req.file.filename}`, // file will be saved as testBucket/contacts.csv
+            Body: fileStream,
+            ACL: 'public-read'
+        };
+        s3.upload(params, function (s3Err, data) {
+            if (s3Err) throw s3Err
+            // console.log(`File uploaded successfully at ${data.Location}`)
+            // res.json({ path: data.Location })
+
+            //Mandar imagen a apiPlantNet
+            const options = {
+                method: 'GET',
+                url: process.env.URL_API_PLANT_NET,
+                qs: { image: data.Location, organ: "leaf" }
+            };
+            request(options, function (error, response, body) {
+                if (error) throw new Error(error);
+                //Responder nombre de la planta y url
+                res.json({ name: JSON.parse(body).species.scientificNameWithoutAuthor, path: data.Location })
+            });
+
+
+            fs.unlink(req.file.path, (err) => {
+                if (err) {
+                    console.error(err)
+                    return
+                }
+                //file removed
+            })
+        });
+    };
+    uploadFile();
 })
 
 module.exports = router;
