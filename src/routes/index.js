@@ -34,39 +34,51 @@ router.route("/register").post((req, res) => {
             res.sendStatus(400)
         } else {
             //Datos correctos, intentar registrar (correo repetido?)
-            bcrypt.hash(user.pass, saltRounds).then(function (hash) {
-                //TODO: Integrar registro con base de datos
-                const options = {
-                    method: 'POST',
-                    url: process.env.URL_USERS,
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: {
-                        email: user.email,
-                        name: user.name,
-                        password: hash
-                    },
-                    json: true
-                };
+            const options = {
+                method: 'GET',
+                url: process.env.URL_USERS,
+                qs: { email: user.email }
+            };
+            request(options, function (error, response, body) {
+                if (error) throw new Error(error);
+                let data = JSON.parse(body)
+                if (data.errorType) {//Correo no usado
+                    bcrypt.hash(user.pass, saltRounds).then(function (hash) {
+                        const options = {
+                            method: 'POST',
+                            url: process.env.URL_USERS,
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: {
+                                email: user.email,
+                                name: user.name,
+                                password: hash
+                            },
+                            json: true
+                        };
 
-                request(options, function (error, response, body) {
-                    if (error) throw new Error(error);
-                    else if (response.status == 406) { //Correo repetido
-                        res.sendStatus(406)
-                    } else {
-                        //Registro correcto
-                        let token = jwt.sign({ //Token de sesion
-                            email: user.email,
-                            name: user.name
-                        }, process.env.JWT_SECRET);
-                        res.json({
-                            token
-                        })
-                    }
+                        request(options, function (error, response, body) {
+                            if (error) throw new Error(error);
+                            else if (response.status == 406) { //Correo repetido
+                                res.sendStatus(406)
+                            } else {
+                                //Registro correcto
+                                let token = jwt.sign({ //Token de sesion
+                                    email: user.email,
+                                    name: user.name
+                                }, process.env.JWT_SECRET);
+                                res.json({
+                                    token
+                                })
+                            }
 
-                });
+                        });
 
+                    });
+                } else {
+                    res.sendStatus(406)
+                }
             });
         }
     }
@@ -78,7 +90,6 @@ router.route("/login").post((req, res) => {
         //Falta algun dato
         res.sendStatus(418)
     } else {
-        //TODO: Solicitar Hash, Email y Nombre de pass a DB
         const options = {
             method: 'GET',
             url: process.env.URL_USERS,
@@ -115,7 +126,7 @@ router.route("/myplants").get((req, res) => {
             url: process.env.URL_PLANTS,
             qs: { email: correo }
         };
-    
+
         request(options, function (error, response, body) {
             if (error) throw new Error(error);
             res.send(body)
@@ -127,7 +138,7 @@ router.route("/myplants").get((req, res) => {
 
 router.route("/plants").get((req, res) => {
     try {
-        if(req.query.token==""||req.query.plant=="")throw 400
+        if (req.query.token == "" || req.query.plant == "") throw 400
         jwt.verify(req.query.token, process.env.JWT_SECRET).email
 
         const options = {
@@ -135,14 +146,14 @@ router.route("/plants").get((req, res) => {
             url: process.env.URL_API_TREFLE,
             qs: { plant: req.query.plant }
         };
-    
+
         request(options, function (error, response, body) {
             if (error) throw new Error(error);
             // res.setHeader('Content-Type', 'application/json' )
-            res.json({light:JSON.parse(body).light,hum:JSON.parse(body).hum})
+            res.json({ light: JSON.parse(body).light, hum: JSON.parse(body).hum })
         });
     } catch (error) {
-        res.sendStatus(error==400?400:401)
+        res.sendStatus(error == 400 ? 400 : 401)
     }
 })
 
