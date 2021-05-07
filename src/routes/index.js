@@ -158,7 +158,7 @@ router.route("/plants").get((req, res) => {
 })
 
 router.route("/plants").post((req, res) => {
-    if (["token", "plant_name", "img_url", "common_name", "light_needed", "hum_needed"].some(e => req.body[e] == "")) {
+    if (["token", "plant_name", "img_url", "common_name", "light_needed", "hum_needed", "soil"].some(e => req.body[e] == "")) {
         res.sendStatus(400) //Información faltante
     } else {
         try {
@@ -185,7 +185,6 @@ router.route("/plants").post((req, res) => {
             res.sendStatus(401)
         }
     }
-
 })
 
 
