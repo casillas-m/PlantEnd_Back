@@ -108,32 +108,42 @@ router.route("/login").post((req, res) => {
 })
 
 router.route("/myplants").get((req, res) => {
-    let correo = jwt.verify(req.query.token, process.env.JWT_SECRET).email
-    const options = {
-        method: 'GET',
-        url: process.env.URL_PLANTS,
-        qs: { email: correo }
-    };
-
-    request(options, function (error, response, body) {
-        if (error) throw new Error(error);
-        res.send(body)
-    });
+    try {
+        let correo = jwt.verify(req.query.token, process.env.JWT_SECRET).email
+        const options = {
+            method: 'GET',
+            url: process.env.URL_PLANTS,
+            qs: { email: correo }
+        };
+    
+        request(options, function (error, response, body) {
+            if (error) throw new Error(error);
+            res.send(body)
+        });
+    } catch (error) {
+        res.sendStatus(401)
+    }
 })
 
 router.route("/plants").get((req, res) => {
-    // console.log(req.query.plant)
-    const options = {
-        method: 'GET',
-        url: process.env.URL_API_TREFLE,
-        qs: { plant: req.query.plant }
-    };
+    try {
+        if(req.query.token==""||req.query.plant=="")throw 400
+        jwt.verify(req.query.token, process.env.JWT_SECRET).email
 
-    request(options, function (error, response, body) {
-        if (error) throw new Error(error);
-        console.log(response)
-        res.send(body)
-    });
+        const options = {
+            method: 'GET',
+            url: process.env.URL_API_TREFLE,
+            qs: { plant: req.query.plant }
+        };
+    
+        request(options, function (error, response, body) {
+            if (error) throw new Error(error);
+            // res.setHeader('Content-Type', 'application/json' )
+            res.json({light:JSON.parse(body).light,hum:JSON.parse(body).hum})
+        });
+    } catch (error) {
+        res.sendStatus(error==400?400:401)
+    }
 })
 
 router.route("/plants").post((req, res) => {
