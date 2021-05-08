@@ -187,6 +187,34 @@ router.route("/plants").post((req, res) => {
     }
 })
 
+router.route("/plants").put((req, res) => {
+    if (["token"].some(e => req.body[e] == "")) {
+        res.sendStatus(400) //Información faltante
+    } else {
+        try {
+            let correo = jwt.verify(req.body.token, process.env.JWT_SECRET).email
+            let forma = JSON.parse(JSON.stringify(req.body)) //Clonando de objetos como un campeon
+            forma.email = correo
+            const options = {
+                method: 'PUT',
+                url: process.env.URL_PLANTS,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(forma)
+            };
+
+            request(options, function (error, response, body) {
+                if (error) throw new Error(error);
+                res.send()
+            });
+        } catch (error) {
+            console.log('------------------------------------');
+            console.log(error);
+            console.log('------------------------------------');
+            res.sendStatus(401)
+        }
+    }
+})
+
 
 router.route("/image").post(upload.single('myFile'), (req, res) => {
     const uploadFile = () => {
