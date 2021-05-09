@@ -240,11 +240,14 @@ router.route("/timers").post((req, res) => {
             const options = {
                 method: 'GET',
                 url: process.env.URL_USERS,
-                qs: { email: req.query.email }
+                qs: { email: correo }
             };
             request(options, function (error, response, body) {
                 if (error) throw new Error(error);
                 let phone = JSON.parse(body).phone
+                console.log('------------------------------------');
+                console.log(body);
+                console.log('------------------------------------');
                 console.log('------------------------------------');
                 console.log("Creando Timer para "+phone);
                 console.log('------------------------------------');
