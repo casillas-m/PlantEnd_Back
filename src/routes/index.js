@@ -16,6 +16,8 @@ const s3 = new AWS.S3({
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
 });
 
+let timersArr = []
+
 router.route("/").get((req, res) => {
     res.json({
         alumnos: "MCR y MMM",
@@ -25,7 +27,7 @@ router.route("/").get((req, res) => {
 
 router.route("/register").post((req, res) => {
     let user = req.body
-    if (!(user.name && user.email && user.pass && user.confirm)) {
+    if (!(user.name && user.email && user.pass && user.confirm && user.phone)) {
         //Falta algun dato
         res.sendStatus(418)
     } else {
@@ -53,7 +55,8 @@ router.route("/register").post((req, res) => {
                             body: {
                                 email: user.email,
                                 name: user.name,
-                                password: hash
+                                password: hash,
+                                phone: user.phone
                             },
                             json: true
                         };
@@ -205,6 +208,75 @@ router.route("/plants").put((req, res) => {
             request(options, function (error, response, body) {
                 if (error) throw new Error(error);
                 res.send()
+            });
+        } catch (error) {
+            console.log('------------------------------------');
+            console.log(error);
+            console.log('------------------------------------');
+            res.sendStatus(401)
+        }
+    }
+})
+
+router.route("/timers").post((req, res) => {
+    if (["token, endpoint_iot, common_name, countDownDate, plant_id"].some(e => req.body[e] == "")) {
+        res.sendStatus(400) //Información faltante
+    } else {
+        try {
+            let correo = jwt.verify(req.body.token, process.env.JWT_SECRET).email //Verificar login
+
+            let index = timersArr.findIndex(o=>o.plant_id==req.body.plant_id)
+            if(index==-1){//Plantid no encontrado, agregarlo
+                index =-1 + timersArr.push({
+                    plant_id: req.body.plant_id,
+                    interval: ""
+                })
+            }else{
+                clearInterval(timersArr[index].interval);//Borrar el anterior
+                console.log('------------------------------------');
+                console.log("Borrando Timer");
+                console.log('------------------------------------');
+            }
+            const options = {
+                method: 'GET',
+                url: process.env.URL_USERS,
+                qs: { email: req.query.email }
+            };
+            request(options, function (error, response, body) {
+                if (error) throw new Error(error);
+                let phone = JSON.parse(body).phone
+                console.log('------------------------------------');
+                console.log("Creando Timer para "+phone);
+                console.log('------------------------------------');
+                timersArr[index].interval = setInterval(function () {
+                    var now = new Date().getTime();
+                    var distance = req.body.countDownDate - now;
+                    if (distance < 0) {
+                        clearInterval(timersArr[index].interval);
+                        console.log('------------------------------------');
+                        console.log(`Now: ${req.body.common_name}`);
+                        console.log('------------------------------------');
+                        //Mandar SMS
+                        const options = {
+                            method: 'POST',
+                            url: process.env.URL_SMS,
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'Authorization': `Basic ${process.env.SMS_TOKEN}`
+                            },
+                            body: JSON.stringify({
+                                to:phone,
+                                content: `Regar: ${req.body.common_name}`,
+                                from: "PlantEnd"
+                            })
+                        };
+            
+                        request(options, function (error, response, body) {
+                            if (error) throw new Error(error);
+                        });
+                    }
+                }, 1000);
+                res.send();
             });
         } catch (error) {
             console.log('------------------------------------');
