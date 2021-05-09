@@ -161,7 +161,7 @@ router.route("/plants").get((req, res) => {
 })
 
 router.route("/plants").post((req, res) => {
-    if (["token", "plant_name", "img_url", "common_name", "light_needed", "hum_needed", "soil"].some(e => req.body[e] == "")) {
+    if (["token", "plant_name", "img_url", "common_name", "light_needed", "hum_needed", "soil", "water"].some(e => req.body[e] == "")) {
         res.sendStatus(400) //Información faltante
     } else {
         try {
@@ -219,7 +219,7 @@ router.route("/plants").put((req, res) => {
 })
 
 router.route("/timers").post((req, res) => {
-    if (["token, endpoint_iot, common_name, countDownDate, plant_id"].some(e => req.body[e] == "")) {
+    if (["token, endpoint_iot, common_name, countDownDate, plant_id, water, hum_needed, light_needed"].some(e => req.body[e] == "")) {
         res.sendStatus(400) //Información faltante
     } else {
         try {
@@ -260,19 +260,47 @@ router.route("/timers").post((req, res) => {
                         console.log(`Now: ${req.body.common_name}`);
                         console.log('------------------------------------');
                         //Mandar SMS
-                        const options = {
-                            method: 'POST',
-                            url: process.env.URL_SMS,
-                            headers: { 
-                                'Content-Type': 'application/json',
-                                'Authorization': `Basic ${process.env.SMS_TOKEN}`
-                            },
-                            body: JSON.stringify({
-                                to:phone,
-                                content: `Regar: ${req.body.common_name}`,
-                                from: "PlantEnd"
-                            })
-                        };
+                        const options;
+                        if(req.body.water){//Automatico
+                            options = {
+                                method: 'GET',
+                                url: process.env.URL_IOT,
+                                qs: { 
+                                    hum: req.body.hum_needed,
+                                    light: req.body.light_needed
+                                }
+                            };
+                            request(options, function (error, response, body) {
+                                if (error) throw new Error(error);
+                                options = {
+                                    method: 'POST',
+                                    url: process.env.URL_SMS,
+                                    headers: { 
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `Basic ${process.env.SMS_TOKEN}`
+                                    },
+                                    body: JSON.stringify({
+                                        to:phone,
+                                        content: `${req.body.common_name} watered. Current light: ${body.light} lux. Current humidity: ${body.humidity}`,
+                                        from: "PlantEnd"
+                                    })
+                                };
+                            });
+                        } else {//Manual
+                            options = {
+                                method: 'POST',
+                                url: process.env.URL_SMS,
+                                headers: { 
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Basic ${process.env.SMS_TOKEN}`
+                                },
+                                body: JSON.stringify({
+                                    to:phone,
+                                    content: `Watering reminder: ${req.body.common_name}`,
+                                    from: "PlantEnd"
+                                })
+                            };
+                        }
             
                         request(options, function (error, response, body) {
                             if (error) throw new Error(error);
