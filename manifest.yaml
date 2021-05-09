@@ -1,0 +1,7 @@
+---
+applications:
+- name: testing
+  random-route: true
+  memory: 128M
+  disk_quota: 256MB
+  path: .
