@@ -261,7 +261,7 @@ router.route("/timers").post((req, res) => {
                         console.log('------------------------------------');
                         //Mandar SMS
                         const options;
-                        if(req.body.water){//Automatico
+                        if(req.body.water=="true"){//Automatico
                             options = {
                                 method: 'GET',
                                 url: process.env.URL_IOT,
