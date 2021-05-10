@@ -219,19 +219,20 @@ router.route("/plants").put((req, res) => {
 })
 
 router.route("/timers").post((req, res) => {
-    if (["token, endpoint_iot, common_name, countDownDate, plant_id, water, hum_needed, light_needed"].some(e => req.body[e] == "")) {
+    if (["token, endpoint_iot, common_name, countDownDate, plant_id, water, hum_needed, light_needed, freq, soil"].some(e => req.body[e] == "")) {
         res.sendStatus(400) //Información faltante
     } else {
         try {
+            let cuerpo = JSON.parse(JSON.stringify(req.body))
             let correo = jwt.verify(req.body.token, process.env.JWT_SECRET).email //Verificar login
 
-            let index = timersArr.findIndex(o=>o.plant_id==req.body.plant_id)
-            if(index==-1){//Plantid no encontrado, agregarlo
-                index =-1 + timersArr.push({
+            let index = timersArr.findIndex(o => o.plant_id == req.body.plant_id)
+            if (index == -1) {//Plantid no encontrado, agregarlo
+                index = -1 + timersArr.push({
                     plant_id: req.body.plant_id,
                     interval: ""
                 })
-            }else{
+            } else {
                 clearInterval(timersArr[index].interval);//Borrar el anterior
                 console.log('------------------------------------');
                 console.log("Borrando Timer");
@@ -249,7 +250,7 @@ router.route("/timers").post((req, res) => {
                 console.log(body);
                 console.log('------------------------------------');
                 console.log('------------------------------------');
-                console.log("Creando Timer para "+phone);
+                console.log("Creando Timer para " + phone);
                 console.log('------------------------------------');
                 timersArr[index].interval = setInterval(function () {
                     var now = new Date().getTime();
@@ -260,51 +261,104 @@ router.route("/timers").post((req, res) => {
                         console.log(`Now: ${req.body.common_name}`);
                         console.log('------------------------------------');
                         //Mandar SMS
-                        const options;
-                        if(req.body.water=="true"){//Automatico
+                        let options;
+                        if (req.body.water == "true") {//Automatico
                             options = {
                                 method: 'GET',
                                 url: process.env.URL_IOT,
-                                qs: { 
+                                qs: {
                                     hum: req.body.hum_needed,
                                     light: req.body.light_needed
                                 }
                             };
                             request(options, function (error, response, body) {
                                 if (error) throw new Error(error);
+                                //Mandar mensaje auto
                                 options = {
                                     method: 'POST',
                                     url: process.env.URL_SMS,
-                                    headers: { 
+                                    headers: {
                                         'Content-Type': 'application/json',
                                         'Authorization': `Basic ${process.env.SMS_TOKEN}`
                                     },
                                     body: JSON.stringify({
-                                        to:phone,
-                                        content: `${req.body.common_name} watered. Current light: ${body.light} lux. Current humidity: ${body.humidity}`,
+                                        to: phone,
+                                        content: `${req.body.common_name} watered. Current light: ${JSON.parse(body).light} lux. Current humidity: ${JSON.parse(body).humidity}`,
                                         from: "PlantEnd"
                                     })
                                 };
+                                request(options, function (error, response, body) {
+                                    if (error) throw new Error(error);
+                                    console.log('---------------Body sms auto------------------');
+                                    console.log(body);
+                                    console.log('------------------------------------');
+                                    if (req.body.water == "true") {
+                                        console.log('------------------------------------');
+                                        console.log("Reacargando timer");
+                                        console.log('------------------------------------');
+                                        let ms = 24 * 60 * 60 * 1000 / req.body.freq
+                                        var now_at_set = new Date().getTime();
+                                        var countDownDate = new Date(now_at_set + ms).getTime();
+                                        cuerpo.countDownDate = countDownDate
+
+                                        let forma = {
+                                            token: req.body.token,
+                                            countDownDate: countDownDate,
+                                            plant_id: req.body.plant_id,
+                                            soil: req.body.soil //Unicamente para evitar un error en la lambda
+                                        }
+                                        let opti = {
+                                            method: 'PUT',
+                                            url: process.env.URL_BACK+"/plants",
+                                            headers: {
+                                                'Content-Type': 'application/json'
+                                            },
+                                            body: JSON.stringify(forma)
+                                        };
+                                        request(opti, function (error, response, body) {
+                                            console.log('----------------Respuesta DB----------------');
+                                            console.log(body);
+                                            console.log('------------------------------------');
+                                            if (error) throw new Error(error);
+                                            let opt = {
+                                                method: 'POST',
+                                                url: process.env.URL_BACK+"/timers",
+                                                headers: {
+                                                    'Content-Type': 'application/json'
+                                                },
+                                                body: JSON.stringify(cuerpo)
+                                            };
+                                            request(opt, function (error, response, body) {
+                                                console.log('----------------Respuesta recarga----------------');
+                                                console.log(body);
+                                                console.log('------------------------------------');
+                                                if (error) throw new Error(error);
+                                            });
+                                        });
+                                    }
+                                })
                             });
                         } else {//Manual
                             options = {
                                 method: 'POST',
                                 url: process.env.URL_SMS,
-                                headers: { 
+                                headers: {
                                     'Content-Type': 'application/json',
                                     'Authorization': `Basic ${process.env.SMS_TOKEN}`
                                 },
                                 body: JSON.stringify({
-                                    to:phone,
+                                    to: phone,
                                     content: `Watering reminder: ${req.body.common_name}`,
                                     from: "PlantEnd"
                                 })
                             };
+                            request(options, function (error, response, body) {
+                                console.log('----------------Body manual----------------');
+                                console.log(body);
+                                console.log('------------------------------------');
+                                if (error) throw new Error(error);
+                            });
                         }
-            
-                        request(options, function (error, response, body) {
-                            if (error) throw new Error(error);
-                        });
                     }
                 }, 1000);
                 res.send();
